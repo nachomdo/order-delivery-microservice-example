@@ -1,5 +1,9 @@
 #!/bin/bash
 
+curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"compatibility": "NONE"}' \
+  http://localhost:8081/config
+
 # Increase the max_connections to 10,000 for the MySQL database instance
 docker-compose exec mysql bash -c 'mysql -u root -p$MYSQL_ROOT_PASSWORD orderweb -e "SET GLOBAL max_connections = 10000;"'
 
@@ -8,6 +12,13 @@ curl -i -X PUT -H "Accept:application/json" -H  "Content-Type:application/json" 
 
 curl -i -X PUT -H "Accept:application/json" -H  "Content-Type:application/json" \
     http://localhost:8083/connectors/driver/config -d @debezium-mysql-connector-driver-outbox.json
+
+curl -i -X PUT -H "Accept:application/json" -H  "Content-Type:application/json" \
+    http://localhost:8083/connectors/order-sr/config -d @debezium-mysql-connector-order-outbox-sr.json
+
+curl -i -X PUT -H "Accept:application/json" -H  "Content-Type:application/json" \
+    http://localhost:8083/connectors/driver-sr/config -d @debezium-mysql-connector-driver-outbox-sr.json
+
 
 # Copy the Pinot table and schema configurations to Pinot container and execute the add table command
 docker cp pinot/order-table-definition.json order-delivery-microservice-example_pinot_1:/opt/pinot

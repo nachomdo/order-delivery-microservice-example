@@ -23,7 +23,7 @@ This application is a work in progress. The full list of initial requirements ar
 
 ### Order Service
 
-API usage information for the `order-web` service can be found [here](order/README.md). 
+API usage information for the `order-web` service can be found [here](order/README.md).
 
 - Includes an order web service that tracks new order deliveries.
 - Includes a load simulator that realistically simulates a fleet of drivers delivering restaurant orders to customers.
@@ -33,11 +33,15 @@ API usage information for the `order-web` service can be found [here](order/READ
 - Generates semi-realistic geospatial updates that tracks the location of an order as it makes its way to a customer’s delivery location.
 - Simulates driver availability based on location and distance from a restaurant location.
 
+
+
 ### Dashboards
 
 - Real-time geospatial dashboard of current deliveries
   - Show current deliveries by restaurant id
   - Show current deliveries by restaurant city
+
+
 
 ## Build and run
 
@@ -49,7 +53,7 @@ $ mvn clean verify
 
 After you have succesfully built the project and docker containers, you can now run the example on a single machine in one of two modes.
 
-The two recipes below for running this example on a single machine have very different system resource requirements. For most developers, it's recommended that you use the **light mode** recipe to get up and running without any performance issues. 
+The two recipes below for running this example on a single machine have very different system resource requirements. For most developers, it's recommended that you use the **light mode** recipe to get up and running without any performance issues.
 
 Before running either of the modes, make sure that you create the following Docker network using the following terminal command.
 
@@ -79,6 +83,7 @@ After this script finishes its tasks, you will now be able to use Apache Pinot t
 
 To start querying data, navigate to the query console and click the `orders` table to execute your first query. If everythiing worked correctly, you should be seeing at least ten rows from the generated SQL query. Should you run into any issues, please create an issue here to get assistance.
 
+
 #### Kepler.gl Visualizations
 
 The SQL query below can be used to create a http://kepler.gl geospatial visualization using CSV export directly from the Pinot query console UI.
@@ -94,6 +99,42 @@ option(skipUpsert=true)
 Notice that in this SQL query I've disabled upserts using `skipUpsert=true`. This means that I want to see the full log of `order` events for each `orderId`. If I were to remove this option or set it to `false`, then I would only get back the most recent state of the `order` object with the primary key `orderId`. This is a very useful feature, as there are many types of analytical queries where we only want to see the current state of a single aggregate. For the purposes of a good geospatial visualization, we'll want to capture all of the geolocation updates as a driver navigates from a restaurant to a delivery location.
 
 You can play around with this query to generate different result sets. In the `WHERE` clause, I've used a Pinot UDF that only fetches order delivery data that is within a 6.5km radius of the specified GPS coordinate. _The coordinate I've provided is located at the center of San Francisco._
+
+#### Alternative approach using KsqlDB
+
+Download required connectors for CDC before bootstrapping your docker-compose
+
+```bash
+confluent-hub install --no-prompt --component-dir ./ksqldb-connect-connectors debezium/debezium-connector-mysql:1.6.0
+```
+
+Run KsqlDB script
+
+```
+ksql http://localhost:8088
+
+
+                  ===========================================
+                  =       _              _ ____  ____       =
+                  =      | | _____  __ _| |  _ \| __ )      =
+                  =      | |/ / __|/ _` | | | | |  _ \      =
+                  =      |   <\__ \ (_| | | |_| | |_) |     =
+                  =      |_|\_\___/\__, |_|____/|____/      =
+                  =                   |_|                   =
+                  =  Event Streaming Database purpose-built =
+                  =        for stream processing apps       =
+                  ===========================================
+
+Copyright 2017-2021 Confluent Inc.
+
+CLI v6.2.0, Server v6.2.0 located at http://localhost:8088
+Server Status: RUNNING
+
+Having trouble? Type 'help' (case-insensitive) for a rundown of how things work!
+
+ksql> RUN SCRIPT './ksqldb-script.sql';
+```
+
 
 ### Heavy mode
 
@@ -116,9 +157,11 @@ $ open http://localhost:8088
 
 Sign-in to the superset web interface using the credentials *admin/admin*. Navigate to the order delivery dashboard. To see order delivery data after first launching the simulation, you should remove the default filter for order status by removing it. This will show you all the orders with their status in real-time as they change. Also, you can set the refresh interval on the dashboard to *10s*, which is done through a configuration button at the top right of the dashboard page.
 
+
+
 ## Change Data Capture
 
-This section provides you with a collection of useful commands for interacting and exploring the CDC features of this example application that are implemented with Debezium. 
+This section provides you with a collection of useful commands for interacting and exploring the CDC features of this example application that are implemented with Debezium.
 
 ### Useful commands
 
@@ -159,8 +202,8 @@ $ curl -i -X PUT -H "Accept:application/json" -H  "Content-Type:application/json
 Getting status of "order" connector:
 
 ```
-$ curl -i -X GET -H "Accept:application/json" -H  "Content-Type:application/json" \   
-    http://localhost:8083/connectors/order/status 
+$ curl -i -X GET -H "Accept:application/json" -H  "Content-Type:application/json" \
+    http://localhost:8083/connectors/order/status
 ```
 
 Create a connector for the `driver_events` table:
@@ -174,7 +217,7 @@ Getting status of "driver" connector:
 
 ```
 $ curl -i -X GET -H "Accept:application/json" -H  "Content-Type:application/json" \
-    http://localhost:8083/connectors/driver/status 
+    http://localhost:8083/connectors/driver/status
 ```
 
 It's possible that the MySQL database may have too many active connections for the Debezium connectors to properly start. If this is the case, simply restart the Debezium Connect container.
@@ -189,3 +232,5 @@ When the container is started and ready, recreate the `order` and driver` connec
 ## License
 
 This project is an open source product licensed under Apache License v2.
+
+

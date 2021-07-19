@@ -30,24 +30,6 @@ services:
       - ZOOKEEPER_CONNECT=zookeeper:2181
     networks:
       - PinotNetwork
-  connect:
-    image: debezium/connect:1.5
-    ports:
-      - 8083:8083
-    links:
-      - kafka
-      - mysql
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - GROUP_ID=1
-      - CONFIG_STORAGE_TOPIC=my_connect_configs
-      - OFFSET_STORAGE_TOPIC=my_connect_offsets
-      - STATUS_STORAGE_TOPIC=my_connect_statuses
-    volumes:
-      # from https://github.com/RedHatInsights/expandjsonsmt/
-      - ./kafka-connect-smt-expandjsonsmt-0.0.7-assemble-all.jar:/kafka/connect/debezium-connector-mysql/expandjsonsmt.jar
-    networks:
-      - PinotNetwork
   mysql:
     image: debezium/example-mysql:1.5
     ports:
@@ -111,6 +93,65 @@ services:
     depends_on: *pinot-depends-on
     networks:
       - PinotNetwork
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:6.2.0
+    container_name: schema-registry
+    hostname: schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:9092'
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+    networks:
+      - PinotNetwork
+    depends_on:
+      - kafka
+
+  ksqldb-server:
+    image: confluentinc/cp-ksqldb-server:latest
+    hostname: ksqldb-server
+    container_name: ksqldb-server
+    restart: always
+    volumes:
+      - ./ksqldb-connect-connectors:/tmp/connectors
+    healthcheck:
+      # healthcheck is currently incompatible with RBAC
+      disable: true
+    depends_on:
+      - kafka
+    networks:
+      - PinotNetwork
+    ports:
+      - "8088:8088"
+      - "8083:8083"
+    user: root
+    environment:
+      CUB_CLASSPATH: '/usr/share/java/confluent-security/ksql/*:/usr/share/java/ksqldb-server/*:/usr/share/java/cp-base-new/*'
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_SERVICE_ID: ksqldb-server-orders
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_KSQL_HIDDEN_TOPICS: '^_.*'
+      # Setting KSQL_KSQL_CONNECT_WORKER_CONFIG enables embedded Kafka Connect
+      KSQL_KSQL_CONNECT_WORKER_CONFIG: "/etc/ksqldb/connect.properties"
+      # Kafka Connect config below
+      KSQL_CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
+      KSQL_CONNECT_REST_ADVERTISED_HOST_NAME: 'ksqldb-server'
+      KSQL_CONNECT_REST_PORT: 8083
+      KSQL_CONNECT_GROUP_ID: ksqldb-kafka-connect-group-01
+      KSQL_CONNECT_CONFIG_STORAGE_TOPIC: _ksqldb-kafka-connect-configs
+      KSQL_CONNECT_OFFSET_STORAGE_TOPIC: _ksqldb-kafka-connect-offsets
+      KSQL_CONNECT_STATUS_STORAGE_TOPIC: _ksqldb-kafka-connect-status
+      KSQL_CONNECT_KEY_CONVERTER: io.confluent.connect.json.JsonSchemaConverter
+      KSQL_CONNECT_VALUE_CONVERTER: io.confluent.connect.json.JsonSchemaConverter
+      KSQL_CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      KSQL_CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: '1'
+      KSQL_CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: '1'
+      KSQL_CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: '1'
+      KSQL_CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: "[%d] %p %X{connector.context}%m (%c:%L)%n"
+      KSQL_CONNECT_PLUGIN_PATH: '/tmp/connectors'
 
 networks:
   PinotNetwork:
